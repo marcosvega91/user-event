@@ -32,6 +32,24 @@ async function type(element, text, {delay = 0, ...options} = {}) {
   return result
 }
 
+// Now we are editing only element of type input/textarea.
+// we should also support contenteditable div. In this case
+// we should type into the div with innerHtml
+const isElementEditable = element => 'value' in element
+
+// When we'll support contenteditable div we should add another check
+const isFocusable = element => {
+  if (
+    element.tagName === 'BUTTON' ||
+    element.tagName === 'TEXTAREA' ||
+    element.tagName === 'INPUT'
+  ) {
+    return !element.disabled
+  }
+
+  return element.getAttribute('tabindex') !== null
+}
+
 async function typeImpl(
   element,
   text,
@@ -43,7 +61,7 @@ async function typeImpl(
     initialSelectionEnd,
   },
 ) {
-  if (element.disabled) return
+  if (!isFocusable(element)) return
 
   if (!skipClick) click(element)
 
@@ -57,11 +75,6 @@ async function typeImpl(
   const currentValue = () => {
     const activeElement = currentElement()
     const value = activeElement.value
-    if (typeof value === 'undefined') {
-      throw new TypeError(
-        `the current element is of type ${activeElement.tagName} and doesn't have a valid value`,
-      )
-    }
     return value
   }
   const setSelectionRange = ({newValue, newSelectionStart}) => {
@@ -95,15 +108,17 @@ async function typeImpl(
   // the only time it would make sense to pass the initialSelectionStart or
   // initialSelectionEnd is if you have an input with a value and want to
   // explicitely start typing with the cursor at 0. Not super common.
-  if (
-    currentElement().selectionStart === 0 &&
-    currentElement().selectionEnd === 0
-  ) {
-    setSelectionRangeIfNecessary(
-      currentElement(),
-      initialSelectionStart ?? currentValue().length,
-      initialSelectionEnd ?? currentValue().length,
-    )
+  if (isElementEditable(currentElement())) {
+    if (
+      currentElement().selectionStart === 0 &&
+      currentElement().selectionEnd === 0
+    ) {
+      setSelectionRangeIfNecessary(
+        currentElement(),
+        initialSelectionStart ?? currentValue().length,
+        initialSelectionEnd ?? currentValue().length,
+      )
+    }
   }
 
   const eventCallbackMap = getEventCallbackMap({
@@ -214,7 +229,7 @@ async function typeImpl(
         ...eventOverrides,
       })
 
-      if (keyPressDefaultNotPrevented) {
+      if (isElementEditable(currentElement()) && keyPressDefaultNotPrevented) {
         let newEntry = char
         if (prevWasMinus) {
           newEntry = `-${char}`
@@ -443,7 +458,7 @@ function getEventCallbackMap({
         ...eventOverrides,
       })
 
-      if (keyPressDefaultNotPrevented) {
+      if (isElementEditable(currentElement()) && keyPressDefaultNotPrevented) {
         fireInputEventIfNeeded({
           ...calculateNewDeleteValue(currentElement(), currentValue()),
           eventOverrides: {
@@ -471,7 +486,7 @@ function getEventCallbackMap({
         ...eventOverrides,
       })
 
-      if (keyPressDefaultNotPrevented) {
+      if (isElementEditable(currentElement()) && keyPressDefaultNotPrevented) {
         fireInputEventIfNeeded({
           ...calculateNewBackspaceValue(currentElement(), currentValue()),
           eventOverrides: {
@@ -491,7 +506,9 @@ function getEventCallbackMap({
     // the user can actually select in several different ways
     // we're not going to choose, so we'll *only* set the selection range
     '{selectall}': () => {
-      currentElement().setSelectionRange(0, currentValue().length)
+      if (isElementEditable(currentElement())) {
+        currentElement().setSelectionRange(0, currentValue().length)
+      }
     },
   }
 
