@@ -198,12 +198,19 @@ test('does not fire keypress or input events when keydown calls prevent default'
   `)
 })
 
-test('does not fire events when disabled', () => {
-  const {element, getEventSnapshot} = setup('<input disabled />')
+test('does not fire events when element is not focusable', () => {
+  let utils = setup('<input disabled />')
 
-  userEvent.type(element, 'a')
-  expect(getEventSnapshot()).toMatchInlineSnapshot(
+  userEvent.type(utils.element, 'a')
+  expect(utils.getEventSnapshot()).toMatchInlineSnapshot(
     `No events were fired on: input[value=""]`,
+  )
+
+  utils = setup('<div />')
+
+  userEvent.type(utils.element, 'a')
+  expect(utils.getEventSnapshot()).toMatchInlineSnapshot(
+    `No events were fired on: div`,
   )
 })
 
@@ -707,11 +714,43 @@ test('typing an invalid input value', () => {
   expect(element.validity.badInput).toBe(false)
 })
 
-test('should give error if we are trying to call type on an invalid element', async () => {
-  const {element} = setup('<div  />')
-  await expect(() =>
-    userEvent.type(element, "I'm only a div :("),
-  ).rejects.toThrowErrorMatchingInlineSnapshot(
-    `"the current element is of type BODY and doesn't have a valid value"`,
-  )
+test('can type in div', () => {
+  const {getEventSnapshot, element} = setup(`
+    <div tabindex="0">first div</div>)
+  `)
+
+  userEvent.type(element, 'write')
+
+  expect(getEventSnapshot()).toMatchInlineSnapshot(`
+    Events fired on: div
+
+    div - pointerover
+    div - pointerenter
+    div - mouseover: Left (0)
+    div - mouseenter: Left (0)
+    div - pointermove
+    div - mousemove: Left (0)
+    div - pointerdown
+    div - mousedown: Left (0)
+    div - focus
+    div - focusin
+    div - pointerup
+    div - mouseup: Left (0)
+    div - click: Left (0)
+    div - keydown: w (119)
+    div - keypress: w (119)
+    div - keyup: w (119)
+    div - keydown: r (114)
+    div - keypress: r (114)
+    div - keyup: r (114)
+    div - keydown: i (105)
+    div - keypress: i (105)
+    div - keyup: i (105)
+    div - keydown: t (116)
+    div - keypress: t (116)
+    div - keyup: t (116)
+    div - keydown: e (101)
+    div - keypress: e (101)
+    div - keyup: e (101)
+  `)
 })
